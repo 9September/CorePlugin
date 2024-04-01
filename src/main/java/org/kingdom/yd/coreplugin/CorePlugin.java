@@ -9,8 +9,11 @@ public final class CorePlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         coreSystem = new CoreSystem(this);
+
         getServer().getPluginManager().registerEvents(coreSystem, this);
         getCommand("core").setExecutor(coreSystem);
+        getCommand("resetstats").setExecutor(new ResetStatsCommand(coreSystem));
+
         coreSystem.loadPlayerSelections();
         getLogger().info(ChatColor.AQUA + "[COREPLUGIN] CorePlugin enabled.");
     }

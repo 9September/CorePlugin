@@ -1,12 +1,17 @@
 package org.kingdom.yd.coreplugin;
 
 import io.lumine.mythic.lib.api.player.EquipmentSlot;
+import io.lumine.mythic.lib.api.stat.StatMap;
 import io.lumine.mythic.lib.api.stat.modifier.StatModifier;
 import io.lumine.mythic.lib.player.modifier.ModifierSource;
 import io.lumine.mythic.lib.player.modifier.ModifierType;
+import net.Indyuce.mmocore.MMOCore;
+import net.Indyuce.mmocore.api.MMOCoreAPI;
 import net.Indyuce.mmocore.api.player.PlayerData;
+import net.Indyuce.mmocore.api.player.attribute.PlayerAttributes;
 import net.Indyuce.mmocore.api.player.stats.PlayerStats;
 import net.Indyuce.mmocore.api.player.stats.StatType;
+import net.Indyuce.mmocore.player.stats.StatInfo;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 
@@ -30,6 +35,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.sql.Array;
 import java.util.*;
+
+import static io.lumine.mythic.lib.api.stat.SharedStat.MAX_HEALTH;
 
 public class CoreSystem implements Listener, CommandExecutor {
 
@@ -154,4 +161,12 @@ public class CoreSystem implements Listener, CommandExecutor {
         Object selection = dataStorage.loadPlayerData(uuid, "selection");
     }
 
+    public void resetAllStatsForPlayer(Player player) {
+        PlayerData playerData = PlayerData.get(player);
+        if (playerData == null) return;
+
+        StatMap statMap = playerData.getStats().getMap();
+
+        statMap.
+    }
 }

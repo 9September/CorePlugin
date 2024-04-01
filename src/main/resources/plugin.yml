@@ -4,5 +4,4 @@ main: org.kingdom.yd.coreplugin.CorePlugin
 api-version: '1.20'
 commands:
   core:
-    description: Opens the core system GUI
-    usage: /core
+  resetstats:
