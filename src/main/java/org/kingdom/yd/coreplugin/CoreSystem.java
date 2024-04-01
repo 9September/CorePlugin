@@ -1,16 +1,25 @@
 package org.kingdom.yd.coreplugin;
 
+import io.lumine.mythic.lib.api.player.EquipmentSlot;
+import io.lumine.mythic.lib.api.stat.modifier.StatModifier;
+import io.lumine.mythic.lib.player.modifier.ModifierSource;
+import io.lumine.mythic.lib.player.modifier.ModifierType;
+import net.Indyuce.mmocore.api.player.PlayerData;
+import net.Indyuce.mmocore.api.player.stats.PlayerStats;
+import net.Indyuce.mmocore.api.player.stats.StatType;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
+
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -19,18 +28,17 @@ import org.bukkit.metadata.MetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.sql.Array;
+import java.util.*;
 
 public class CoreSystem implements Listener, CommandExecutor {
 
     private final CorePlugin plugin;
-    private static final Map<UUID, Map<Integer, Boolean>> playerSelections = new HashMap<>();
-    private final Map<UUID, Inventory> playerCoreSelections = new HashMap<>();
+    private PlayerDataStorage dataStorage;
 
     public CoreSystem(CorePlugin plugin) {
         this.plugin = plugin;
+        this.dataStorage = new PlayerDataStorage(plugin);
     }
 
     @Override
@@ -39,139 +47,111 @@ public class CoreSystem implements Listener, CommandExecutor {
             Player player = (Player) commandSender;
             openCoreGUI(player);
         }
-
-
         return true;
     }
 
     public void openCoreGUI(Player player) {
-        Inventory coreGUI = Bukkit.createInventory(null, 54, ChatColor.AQUA + "" + ChatColor.BOLD + "CORE SYSTEM");
-
-        // 선택 가능한 슬롯 설정
-        int[] slots = {12,14,20,24,38,42,48,50};
-        Map<Integer, Boolean> selections = playerSelections.getOrDefault(player.getUniqueId(), new HashMap<>());
+        Inventory gui = plugin.getServer().createInventory(null, 45, ChatColor.AQUA + "CORE SYSTEM");
+        int[] slots = {3,5,11,15,29,33,39,41};
+        UUID playerUUID = player.getUniqueId();
 
         for (int slot : slots) {
-            if (selections.getOrDefault(slot, false)) {
-                // 이미 선택된 코어에 대한 처리, 예: 다른 아이템 또는 표시 방법 사용
-            } else {
-                coreGUI.setItem(slot, createGuiItem(Material.BLACK_STAINED_GLASS_PANE, "Select Attribute"));
-            }
+            StatType selectedStat = getSelectedStatForSlot(player, slot);
+
+            ItemStack item = switch (selectedStat) {
+                case MAX_HEALTH -> createAttributeItem(Material.APPLE, ChatColor.GREEN + "Max Health", "MAX_HEALTH");
+                case ATTACK_DAMAGE -> createAttributeItem(Material.IRON_SWORD, ChatColor.RED + "Attack Damage", "ATTACK_DAMAGE");
+                // 다른 속성에 대한 처리를 여기에 추가...
+                default -> new ItemStack(Material.BLACK_STAINED_GLASS_PANE); // 속성이 선택되지 않았을 때 기본 아이템
+            };
+
+            gui.setItem(slot, item);
         }
 
-        // 스탯 초기화 버튼 추가
-        coreGUI.setItem(53, createGuiItem(Material.REDSTONE_BLOCK, ChatColor.RED + "스탯 초기화"));
-
-        player.openInventory(coreGUI);
+        player.openInventory(gui);
     }
 
-    private Inventory createCoreSystemGUI() {
-        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.AQUA + "" + ChatColor.BOLD + "CORE SYSTEM");
-        int[] slots = {12,14,20,24,38,42,48,50};
-        for (int slot : slots) {
-            inventory.setItem(slot, createGuiItem(Material.BLACK_STAINED_GLASS_PANE, "Select Attribute"));
+    private StatType getSelectedStatForSlot(Player player, int slot) {
+        String attributeKey = dataStorage.getAttributeSelection(player.getUniqueId(), slot);
+        if (attributeKey == null || attributeKey.isEmpty()) {
+            return null; //또는 기본값
         }
-        inventory.setItem(53, createGuiItem(Material.REDSTONE_BLOCK, "코어 초기화"));
-        return inventory;
+        try {
+            return StatType.valueOf(attributeKey.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null; //또는 기본값
+        }
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player) || e.getCurrentItem() == null || e.getCurrentItem().getType() == Material.AIR) return;
-
+        if (!(e.getWhoClicked() instanceof Player)) return;
         Player player = (Player) e.getWhoClicked();
+        Inventory clickedInventory = e.getClickedInventory();
         ItemStack clickedItem = e.getCurrentItem();
-        Inventory clickedinventory = e.getClickedInventory();
-        String inventoryTitle = e.getView().getTitle();
-        int slot = e.getRawSlot();
 
+        if (clickedInventory.getType() == InventoryType.CHEST && clickedItem != null) {
+            //CORE SYSTEM
+            if (e.getView().getTitle().equals(ChatColor.AQUA + "CORE SYSTEM")) {
+                e.setCancelled(true);
+                openAttributeGUI(player);
+            }
+            //Attribute Selection
+            if (e.getView().getTitle().equals(ChatColor.AQUA + "Attribute Selection")) {
+                e.setCancelled(true);
+                String attributeKey = null;
 
-        //CORE SYSTEM GUI
-        if (inventoryTitle.equals(ChatColor.AQUA + "" + ChatColor.BOLD + "CORE SYSTEM")) {
-            e.setCancelled(true);
-            Map<Integer, Boolean> selections = playerSelections.getOrDefault(player.getUniqueId(), new HashMap<>());
-            if (slot == 12 || slot == 14 || slot == 20 || slot == 24 || slot == 38 || slot == 42 || slot == 48 || slot == 50) {
-                openAttributeSelectionGUI(player, slot);
-            }
-            if (slot == 53) {
-                PlayerStatus.resetPlayerAttributes(player);
-                player.sendMessage(ChatColor.RED + "스탯이 초기화되었습니다.");
-                openCoreGUI(player);
-                return;
-            }
-            if (selections.getOrDefault(slot, false)) {
-                player.sendMessage(ChatColor.RED + "이미 선택된 항목입니다.");
-                return;
-            }
-        }
+                if (clickedItem.getType() == Material.APPLE) {
+                    attributeKey = StatType.MAX_HEALTH.name();
+                }
 
-        //속성 선택 GUI
-        if (inventoryTitle.startsWith("속성 선택")) {
-            if (player.hasMetadata("selectedCoreSlot")) {
-                MetadataValue value = player.getMetadata("selectedCoreSlot").get(0);
-                int selectedSlot = value.asInt();
+                if (attributeKey != null) {
+                    dataStorage.saveAttributeSelection(player.getUniqueId(), e.getSlot(), attributeKey);
 
-                updateCoreSystemGUI(player, selectedSlot, clickedItem);
-                PlayerStatus.modifyPlayerDataBasedOnAttributeName(player, clickedItem.getItemMeta().getDisplayName());
-                player.removeMetadata("selectedCoreSlot", JavaPlugin.getPlugin(CorePlugin.class));
+                    handleAttributeSelection(player, StatType.valueOf(attributeKey));
+
+                    openCoreGUI(player);
+                }
+
             }
-            e.setCancelled(true);
         }
     }
 
+    public void openAttributeGUI(Player player) {
+        Inventory attributeGUI = Bukkit.createInventory(null, 9, ChatColor.AQUA + "Attribute Selection");
 
-    private void openAttributeSelectionGUI(Player player, int slot) {
-        Inventory attrInv = Bukkit.createInventory(null,9,"속성 선택");
-        attrInv.setItem(0,createGuiItem(Material.IRON_SWORD,"힘"));
-        attrInv.setItem(1, createGuiItem(Material.FEATHER, "민첩"));
-        attrInv.setItem(2, createGuiItem(Material.SNOWBALL, "지력"));
+        ItemStack healthItem = createAttributeItem(Material.APPLE, ChatColor.GREEN + "MAX_HEALTH", "health");
 
-        player.setMetadata("selectedCoreSlot", new FixedMetadataValue(JavaPlugin.getPlugin(CorePlugin.class), slot));
-        player.openInventory(attrInv);
+        attributeGUI.setItem(0, healthItem);
+        player.openInventory(attributeGUI);
     }
 
-    private void updateCoreSystemGUI(Player player, int slot, ItemStack attributeItem) {
-        Inventory coreSystem = playerCoreSelections.get(player.getUniqueId());
-        if (coreSystem == null) {
-            coreSystem = createCoreSystemGUI();
-            playerCoreSelections.put(player.getUniqueId(), coreSystem);
-        }
-
-        coreSystem.setItem(slot, attributeItem);
-
-        player.openInventory(coreSystem);
-    }
-
-
-    private ItemStack createGuiItem(Material material, String name) {
-        ItemStack item = new ItemStack(material, 1);
-        ItemMeta meta  = item.getItemMeta();
-
+    private ItemStack createAttributeItem(Material material, String displayName, String attributeKey) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(name);
+            meta.setDisplayName(displayName);
+            List<String> lore = new ArrayList<>();
+            lore.add(ChatColor.GRAY + "속성: "+attributeKey);
+            meta.setLore(lore);
             item.setItemMeta(meta);
         }
         return item;
     }
 
+    public void handleAttributeSelection(Player player, StatType selectedStat) {
+        PlayerData playerData = PlayerData.get(player);
+        PlayerStats playerStats = playerData.getStats();
 
-    public void setPlayerSelections(UUID playerUUID, Map<Integer, Boolean> selections) {
-        this.playerSelections.put(playerUUID, selections);
+        double currentMaxHealth = playerStats.getStat(StatType.MAX_HEALTH.name());
+        playerStats.getMap().getInstance(StatType.MAX_HEALTH.name()).addModifier(new StatModifier("selectedAttribute", selectedStat.name(), 10, ModifierType.FLAT, EquipmentSlot.OTHER, ModifierSource.OTHER));
+
+        player.sendMessage(ChatColor.GREEN + "Your " + selectedStat.name() + "has been increased!");
     }
 
-    public void updatePlayerGUI(Player player) {
-        Inventory coreGUI = playerCoreSelections.get(player.getUniqueId());
-        if (coreGUI == null) {
-            coreGUI = createCoreSystemGUI();
-            playerCoreSelections.put(player.getUniqueId(), coreGUI);
-        }
-
-        Map<Integer, Boolean> selections = playerSelections.getOrDefault(player.getUniqueId(), new HashMap<>());
-    }
-
-
-    public static void clearPlayerSelections(UUID playerUUID) {
-        playerSelections.remove(playerUUID);
+    public void loadPlayerSelections() {
+        UUID uuid = UUID.fromString("player-uuid");
+        Object selection = dataStorage.loadPlayerData(uuid, "selection");
     }
 
 }

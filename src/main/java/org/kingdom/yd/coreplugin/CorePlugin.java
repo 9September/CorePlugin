@@ -1,17 +1,49 @@
 package org.kingdom.yd.coreplugin;
 
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.ChatColor;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.UUID;
-
 public final class CorePlugin extends JavaPlugin {
+    private CoreSystem coreSystem;
+
+    @Override
+    public void onEnable() {
+        coreSystem = new CoreSystem(this);
+        getServer().getPluginManager().registerEvents(coreSystem, this);
+        getCommand("core").setExecutor(coreSystem);
+        coreSystem.loadPlayerSelections();
+        getLogger().info(ChatColor.AQUA + "[COREPLUGIN] CorePlugin enabled.");
+    }
+
+    @Override
+    public void onDisable() {
+        getLogger().info(ChatColor.AQUA + "[COREPLUGIN] CorePlugin disabled.");
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /*
     private File dataFile;
     private FileConfiguration playersData;
     private CoreSystem coreSystem;
@@ -55,6 +87,9 @@ public final class CorePlugin extends JavaPlugin {
     }
 
     private void loadPlayerSelections() {
+        if (!getDataFolder().exists()) {
+            getDataFolder().mkdirs();
+        }
         File dataFile = new File(getDataFolder(), "playerData.yml");
         FileConfiguration dataConfig = YamlConfiguration.loadConfiguration(dataFile);
 
@@ -83,6 +118,7 @@ public final class CorePlugin extends JavaPlugin {
     public void onDisable() {
         getLogger().info("CorePlugin has been disabled.");
     }
+    */
 
 
 }
