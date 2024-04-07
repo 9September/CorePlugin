@@ -72,19 +72,6 @@ public class CoreSystem implements Listener, CommandExecutor {
         player.openInventory(gui);
     }
 
-    private StatType getSelectedStatForSlot(Player player, int slot) {
-        String attributeKey = dataStorage.getAttributeSelection(player.getUniqueId(), slot);
-        if (attributeKey == null) {
-            return null;
-        }
-        try {
-            return StatType.valueOf(attributeKey.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            plugin.getLogger().warning("Invalid StatType: " + attributeKey);
-            return null;
-        }
-    }
-
     private ItemStack createItemForStat(StatType statType) {
         if (statType == null) {
             return new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
