@@ -136,11 +136,11 @@ public class CoreSystem implements Listener, CommandExecutor {
         switch (type) {
             case APPLE:
                 attributeKey = StatType.MAX_HEALTH.name();
-                attributeValue = 10;
+                attributeValue = 10;    //1당 하트 반칸
                 break;
             case IRON_SWORD:
                 attributeKey = StatType.ATTACK_DAMAGE.name();
-                attributeValue = 5; //1당 인게임 2.5 데미지
+                attributeValue = 5;     //1당 인게임 2.5 데미지
                 break;
             default:
                 plugin.getLogger().warning("Unknown item type for attribute selection");
