@@ -33,19 +33,19 @@ import org.bukkit.metadata.MetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
 import java.sql.Array;
 import java.util.*;
 
 import static io.lumine.mythic.lib.api.stat.SharedStat.MAX_HEALTH;
 
 public class CoreSystem implements Listener, CommandExecutor {
-
     private final CorePlugin plugin;
-    private PlayerDataStorage dataStorage;
+    private final PlayerDataStorage dataStorage;
 
-    public CoreSystem(CorePlugin plugin) {
+    public CoreSystem(CorePlugin plugin, PlayerDataStorage dataStorage) {
         this.plugin = plugin;
-        this.dataStorage = new PlayerDataStorage(plugin);
+        this.dataStorage = dataStorage;
     }
 
     @Override
@@ -60,17 +60,11 @@ public class CoreSystem implements Listener, CommandExecutor {
     public void openCoreGUI(Player player) {
         Inventory gui = plugin.getServer().createInventory(null, 45, ChatColor.AQUA + "CORE SYSTEM");
         int[] slots = {3,5,11,15,29,33,39,41};
-        UUID playerUUID = player.getUniqueId();
 
         for (int slot : slots) {
-            StatType selectedStat = getSelectedStatForSlot(player, slot);
-
-            ItemStack item = switch (selectedStat) {
-                case MAX_HEALTH -> createAttributeItem(Material.APPLE, ChatColor.GREEN + "Max Health", "MAX_HEALTH");
-                case ATTACK_DAMAGE -> createAttributeItem(Material.IRON_SWORD, ChatColor.RED + "Attack Damage", "ATTACK_DAMAGE");
-                // 다른 속성에 대한 처리를 여기에 추가...
-                default -> new ItemStack(Material.BLACK_STAINED_GLASS_PANE); // 속성이 선택되지 않았을 때 기본 아이템
-            };
+            String attributeKey = dataStorage.getAttributeSelection(player.getUniqueId(), slot);
+            StatType selectedStat = attributeKey != null ? StatType.valueOf(attributeKey) : null;
+            ItemStack item = createItemForStat(selectedStat);
 
             gui.setItem(slot, item);
         }
@@ -80,13 +74,29 @@ public class CoreSystem implements Listener, CommandExecutor {
 
     private StatType getSelectedStatForSlot(Player player, int slot) {
         String attributeKey = dataStorage.getAttributeSelection(player.getUniqueId(), slot);
-        if (attributeKey == null || attributeKey.isEmpty()) {
-            return null; //또는 기본값
+        if (attributeKey == null) {
+            return null;
         }
         try {
             return StatType.valueOf(attributeKey.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return null; //또는 기본값
+            plugin.getLogger().warning("Invalid StatType: " + attributeKey);
+            return null;
+        }
+    }
+
+    private ItemStack createItemForStat(StatType statType) {
+        if (statType == null) {
+            return new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        }
+
+        switch (statType) {
+            case MAX_HEALTH:
+                return createAttributeItem(Material.APPLE, "Max Health", "MAX_HEALTH");
+            case ATTACK_DAMAGE:
+                return createAttributeItem(Material.IRON_SWORD, "Attack Damage", "ATTACK_DAMAGE");
+            default:
+                return new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
         }
     }
 
@@ -97,76 +107,96 @@ public class CoreSystem implements Listener, CommandExecutor {
         Inventory clickedInventory = e.getClickedInventory();
         ItemStack clickedItem = e.getCurrentItem();
 
-        if (clickedInventory.getType() == InventoryType.CHEST && clickedItem != null) {
-            //CORE SYSTEM
-            if (e.getView().getTitle().equals(ChatColor.AQUA + "CORE SYSTEM")) {
-                e.setCancelled(true);
-                openAttributeGUI(player);
+        if (clickedInventory == null || clickedItem == null) return;
+
+
+        //CORE SYSTEM
+        if (e.getView().getTitle().equals(ChatColor.AQUA + "CORE SYSTEM")) {
+            e.setCancelled(true);
+            if (clickedItem.getType().equals(Material.BLACK_STAINED_GLASS_PANE)) {
+                openAttributeGUI(player, e.getSlot());
+            } else {
+                player.sendMessage(ChatColor.RED + "한 번 선택한 속성은 다시 변경할 수 없습니다! (속성 초기화권 필요)");
             }
-            //Attribute Selection
-            if (e.getView().getTitle().equals(ChatColor.AQUA + "Attribute Selection")) {
-                e.setCancelled(true);
-                String attributeKey = null;
+            return;
+        }
 
-                if (clickedItem.getType() == Material.APPLE) {
-                    attributeKey = StatType.MAX_HEALTH.name();
-                }
+        //Attribute Selection
+        if (e.getView().getTitle().equals(ChatColor.AQUA + "Attribute Selection")) {
+            e.setCancelled(true);
+            handleAttributeSelectionFromGUI(player, e.getSlot(), clickedItem);
+        }
 
-                if (attributeKey != null) {
-                    dataStorage.saveAttributeSelection(player.getUniqueId(), e.getSlot(), attributeKey);
+    }
+    private void handleAttributeSelectionFromGUI(Player player, int slot, ItemStack item) {
+        Material type = item.getType();
+        String attributeKey = null;
+        int attributeValue = 0;
 
-                    handleAttributeSelection(player, StatType.valueOf(attributeKey));
+        switch (type) {
+            case APPLE:
+                attributeKey = StatType.MAX_HEALTH.name();
+                attributeValue = 10;
+                break;
+            case IRON_SWORD:
+                attributeKey = StatType.ATTACK_DAMAGE.name();
+                attributeValue = 5; //1당 인게임 2.5 데미지
+                break;
+            default:
+                plugin.getLogger().warning("Unknown item type for attribute selection");
+                return;
+        }
 
-                    openCoreGUI(player);
-                }
-
-            }
+        if (attributeKey != null) {
+            int clickedSlot = player.getMetadata("selectedSlot").isEmpty() ? slot : player.getMetadata("selectedSlot").get(0).asInt();
+            dataStorage.saveAttributeSelection(player.getUniqueId(), player.getName(), clickedSlot, attributeKey, attributeValue);
+            handleAttributeSelection(player, StatType.valueOf(attributeKey));
+            player.closeInventory();
+            Bukkit.getScheduler().runTaskLater(plugin, () -> openCoreGUI(player), 2L);
         }
     }
-
-    public void openAttributeGUI(Player player) {
+    public void openAttributeGUI(Player player, int clickedSlot) {
         Inventory attributeGUI = Bukkit.createInventory(null, 9, ChatColor.AQUA + "Attribute Selection");
 
-        ItemStack healthItem = createAttributeItem(Material.APPLE, ChatColor.GREEN + "MAX_HEALTH", "health");
+        ItemStack healthItem = createAttributeItem(Material.APPLE, ChatColor.GREEN + "Max Health", "MAX_HEALTH");
+        ItemStack damageItem = createAttributeItem(Material.IRON_SWORD, ChatColor.RED + "Attack Damage", "ATTACK_DAMAGE");
 
         attributeGUI.setItem(0, healthItem);
+        attributeGUI.setItem(1, damageItem);
+
         player.openInventory(attributeGUI);
+        player.setMetadata("selectedSlot", new FixedMetadataValue(plugin, clickedSlot));
     }
 
-    private ItemStack createAttributeItem(Material material, String displayName, String attributeKey) {
+    private ItemStack createAttributeItem(Material material, String displayName, String loreText) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(displayName);
-            List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + "속성: "+attributeKey);
-            meta.setLore(lore);
+            meta.setDisplayName(ChatColor.GREEN + displayName);
+            meta.setLore(Arrays.asList(ChatColor.GRAY + "속성: " + loreText));
             item.setItemMeta(meta);
         }
         return item;
     }
 
+
     public void handleAttributeSelection(Player player, StatType selectedStat) {
         PlayerData playerData = PlayerData.get(player);
         PlayerStats playerStats = playerData.getStats();
 
-        double currentMaxHealth = playerStats.getStat(StatType.MAX_HEALTH.name());
-        playerStats.getMap().getInstance(StatType.MAX_HEALTH.name()).addModifier(new StatModifier("selectedAttribute", selectedStat.name(), 10, ModifierType.FLAT, EquipmentSlot.OTHER, ModifierSource.OTHER));
+        switch (selectedStat) {
+            case MAX_HEALTH:
+                double currentMaxHealth = playerStats.getStat(StatType.MAX_HEALTH.name());
+                playerStats.getMap().getInstance(StatType.MAX_HEALTH.name()).addModifier(new StatModifier("selectedAttribute", selectedStat.name(), 10, ModifierType.FLAT, EquipmentSlot.OTHER, ModifierSource.OTHER));
+                break;
+            case ATTACK_DAMAGE:
+                playerStats.getMap().getInstance(StatType.ATTACK_DAMAGE.name()).addModifier(new StatModifier("selectedAttribute", selectedStat.name(), 10, ModifierType.FLAT, EquipmentSlot.MAIN_HAND, ModifierSource.MAINHAND_ITEM));
+                break;
+        }
 
-        player.sendMessage(ChatColor.GREEN + "Your " + selectedStat.name() + "has been increased!");
+
+        player.sendMessage(ChatColor.GREEN + "Your " + selectedStat.name() + " has been increased!");
     }
 
-    public void loadPlayerSelections() {
-        UUID uuid = UUID.fromString("player-uuid");
-        Object selection = dataStorage.loadPlayerData(uuid, "selection");
-    }
 
-    public void resetAllStatsForPlayer(Player player) {
-        PlayerData playerData = PlayerData.get(player);
-        if (playerData == null) return;
-
-        StatMap statMap = playerData.getStats().getMap();
-
-        statMap.
-    }
 }

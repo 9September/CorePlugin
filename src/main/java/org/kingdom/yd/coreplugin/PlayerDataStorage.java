@@ -4,51 +4,65 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.UUID;
 
 public class PlayerDataStorage {
     private CorePlugin plugin;
-    private File dataFolder;
+    private File dataFile;
     private FileConfiguration config;
 
     public PlayerDataStorage(CorePlugin plugin) {
         this.plugin = plugin;
-        this.dataFolder = new File(plugin.getDataFolder(), "playerData");
-        if (!dataFolder.exists()) dataFolder.mkdirs();
-        loadData();
-    }
-
-    public void loadData() {
-        File file = new File(dataFolder, "data.yml");
-        if (!file.exists()) {
-            plugin.saveResource("data.yml", false);
+        this.dataFile = new File(plugin.getDataFolder(), "data.yml");
+        if (!dataFile.exists()) {
+            try {
+                dataFile.createNewFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-        config = YamlConfiguration.loadConfiguration(file);
+        config = YamlConfiguration.loadConfiguration(dataFile);
     }
 
-    public void savePlayerData(UUID uuid, String path, Object value) {
-        config.set(uuid.toString() + "." + path, value);
-        saveData();
-    }
-
-    public void saveAttributeSelection(UUID uuid, int slot, String attributeKey) {
-        config.set(uuid.toString() + ".attributes." + slot, attributeKey);
+    public void saveAttributeSelection(UUID uuid, String playerName,int slot, String attributeKey, int value) {
+        config.set(uuid.toString() + ".name", playerName);
+        config.set(uuid.toString() + ".attributes." + slot + ".key", attributeKey);
+        config.set(uuid.toString() + ".attributes." + slot + ".value", value);
         saveData();
     }
 
     public String getAttributeSelection(UUID uuid, int slot) {
-        return config.getString(uuid.toString() + ".attributes." + slot);
-    }
-
-    public Object loadPlayerData(UUID uuid, String path) {
-        return config.get(uuid.toString() + "." + path);
+        return config.getString(uuid.toString() + ".attributes." + slot + ".key");
     }
 
     public void saveData() {
         try {
-            config.save(new File(dataFolder, "data.yml"));
+            config.save(dataFile);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    public void loadPlayerSelections() {
+        if (!dataFile.exists()) {
+            return;
+        }
+
+        try {
+            config = YamlConfiguration.loadConfiguration(dataFile);
+            for (String uuidKey : config.getKeys(false)) {
+                UUID uuid = UUID.fromString(uuidKey);
+                for (String slotKey : config.getConfigurationSection(uuidKey + ".attributes").getKeys(false)) {
+                    String attributeKey = config.getString(uuidKey + ".attributes." + slotKey + ".key");
+                    int value = config.getInt(uuidKey + ".attributes." + slotKey + ".value");
+                    System.out.println("Loaded " + attributeKey + " for slot " + slotKey + " with value " + value + " for UUID " + uuid);
+                    // 추가적인 데이터 복원 로직이 필요할 수 있습니다.
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            plugin.getLogger().severe("Failed to load player selections: " + e.getMessage());
         }
     }
 
