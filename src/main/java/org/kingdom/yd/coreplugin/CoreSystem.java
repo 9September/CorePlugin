@@ -37,6 +37,7 @@ import java.io.File;
 import java.sql.Array;
 import java.util.*;
 
+import static io.lumine.mythic.lib.api.stat.SharedStat.CRITICAL_STRIKE_POWER;
 import static io.lumine.mythic.lib.api.stat.SharedStat.MAX_HEALTH;
 
 public class CoreSystem implements Listener, CommandExecutor {
@@ -78,10 +79,20 @@ public class CoreSystem implements Listener, CommandExecutor {
         }
 
         switch (statType) {
-            case MAX_HEALTH:
-                return createAttributeItem(Material.APPLE, "Max Health", "MAX_HEALTH");
-            case ATTACK_DAMAGE:
-                return createAttributeItem(Material.IRON_SWORD, "Attack Damage", "ATTACK_DAMAGE");
+            case SKILL_CRITICAL_STRIKE_CHANCE:
+                return createAttributeItem(Material.RED_DYE, ChatColor.RED + "크리티컬 데미지", "SKILL_CRITICAL_STRIKE_CHANCE");
+            case PHYSICAL_DAMAGE:
+                return createAttributeItem(Material.ORANGE_DYE, ChatColor.GOLD + "물리 데미지", "PHYSICAL_DAMAGE");
+            case MAGIC_DAMAGE:
+                return createAttributeItem(Material.YELLOW_DYE, ChatColor.YELLOW + "마법 데미지", "MAGIC_DAMAGE");
+            case MAX_MANA:
+                return createAttributeItem(Material.GREEN_DYE, ChatColor.GREEN + "마나", "MAX_MANA");
+            case MANA_REGENERATION:
+                return createAttributeItem(Material.BLUE_DYE, ChatColor.BLUE + "마나 재생", "MANA_REGENERATION");
+            case MOVEMENT_SPEED:
+                return createAttributeItem(Material.PURPLE_DYE, ChatColor.LIGHT_PURPLE + "이동 속도", "MOVEMENT_SPEED");
+            case COOLDOWN_REDUCTION:
+                return createAttributeItem(Material.WHITE_DYE, ChatColor.WHITE + "쿨타임 감소", "COOLDOWN_REDUCTION");
             default:
                 return new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
         }
@@ -121,13 +132,33 @@ public class CoreSystem implements Listener, CommandExecutor {
         int attributeValue = 0;
 
         switch (type) {
-            case APPLE:
-                attributeKey = StatType.MAX_HEALTH.name();
-                attributeValue = 10;    //1당 하트 반칸
+            case RED_DYE:
+                attributeKey = StatType.SKILL_CRITICAL_STRIKE_CHANCE.name();
+                attributeValue = 10;
                 break;
-            case IRON_SWORD:
-                attributeKey = StatType.ATTACK_DAMAGE.name();
-                attributeValue = 5;     //1당 인게임 2.5 데미지
+            case ORANGE_DYE:
+                attributeKey = StatType.PHYSICAL_DAMAGE.name();
+                attributeValue = 10;
+                break;
+            case YELLOW_DYE:
+                attributeKey = StatType.MAGIC_DAMAGE.name();
+                attributeValue = 10;
+                break;
+            case GREEN_DYE:
+                attributeKey = StatType.MAX_MANA.name();
+                attributeValue = 10;
+                break;
+            case BLUE_DYE:
+                attributeKey = StatType.MANA_REGENERATION.name();
+                attributeValue = 10;
+                break;
+            case PURPLE_DYE:
+                attributeKey = StatType.MOVEMENT_SPEED.name();
+                attributeValue = 10;
+                break;
+            case WHITE_DYE:
+                attributeKey = StatType.COOLDOWN_REDUCTION.name();
+                attributeValue = 10;
                 break;
             default:
                 plugin.getLogger().warning("Unknown item type for attribute selection");
@@ -145,11 +176,21 @@ public class CoreSystem implements Listener, CommandExecutor {
     public void openAttributeGUI(Player player, int clickedSlot) {
         Inventory attributeGUI = Bukkit.createInventory(null, 9, ChatColor.AQUA + "Attribute Selection");
 
-        ItemStack healthItem = createAttributeItem(Material.APPLE, ChatColor.GREEN + "Max Health", "MAX_HEALTH");
-        ItemStack damageItem = createAttributeItem(Material.IRON_SWORD, ChatColor.RED + "Attack Damage", "ATTACK_DAMAGE");
+        ItemStack critical = createAttributeItem(Material.RED_DYE, ChatColor.RED + "크리티컬 데미지", "SKILL_CRITICAL_STRIKE_CHANCE");
+        ItemStack physical = createAttributeItem(Material.ORANGE_DYE, ChatColor.GOLD + "물리 데미지", "PHYSICAL_DAMAGE");
+        ItemStack magical = createAttributeItem(Material.YELLOW_DYE, ChatColor.YELLOW + "마법 데미지", "MAGIC_DAMAGE");
+        ItemStack mana = createAttributeItem(Material.GREEN_DYE, ChatColor.GREEN + "마나", "MAX_MANA");
+        ItemStack manaregeneration = createAttributeItem(Material.BLUE_DYE, ChatColor.BLUE + "마나 재생", "MANA_REGENERATION");
+        ItemStack speed = createAttributeItem(Material.PURPLE_DYE, ChatColor.LIGHT_PURPLE + "이동 속도", "MOVEMENT_SPEED");
+        ItemStack cooldown = createAttributeItem(Material.WHITE_DYE, ChatColor.WHITE + "쿨타임 감소", "COOLDOWN_REDUCTION");
 
-        attributeGUI.setItem(0, healthItem);
-        attributeGUI.setItem(1, damageItem);
+        attributeGUI.setItem(1, critical);
+        attributeGUI.setItem(2, physical);
+        attributeGUI.setItem(3, magical);
+        attributeGUI.setItem(4, mana);
+        attributeGUI.setItem(5, manaregeneration);
+        attributeGUI.setItem(6, speed);
+        attributeGUI.setItem(7, cooldown);
 
         player.openInventory(attributeGUI);
         player.setMetadata("selectedSlot", new FixedMetadataValue(plugin, clickedSlot));
@@ -166,24 +207,78 @@ public class CoreSystem implements Listener, CommandExecutor {
         return item;
     }
 
-
     public void handleAttributeSelection(Player player, StatType selectedStat) {
         PlayerData playerData = PlayerData.get(player);
         PlayerStats playerStats = playerData.getStats();
+        StatMap statMap = playerStats.getMap();
 
-        switch (selectedStat) {
-            case MAX_HEALTH:
-                double currentMaxHealth = playerStats.getStat(StatType.MAX_HEALTH.name());
-                playerStats.getMap().getInstance(StatType.MAX_HEALTH.name()).addModifier(new StatModifier("selectedAttribute", selectedStat.name(), 10, ModifierType.FLAT, EquipmentSlot.OTHER, ModifierSource.OTHER));
-                break;
-            case ATTACK_DAMAGE:
-                playerStats.getMap().getInstance(StatType.ATTACK_DAMAGE.name()).addModifier(new StatModifier("selectedAttribute", selectedStat.name(), 10, ModifierType.FLAT, EquipmentSlot.MAIN_HAND, ModifierSource.MAINHAND_ITEM));
-                break;
+        // 각 StatType별 증가값 설정
+        int additionalValue = getAdditionalValue(selectedStat);
+        ModifierType modifierType = getModifierType(selectedStat);
+        EquipmentSlot equipmentSlot = EquipmentSlot.OTHER; //필요 시 getEquipmentSlot() 생성 후 사용
+        ModifierSource modifierSource = getModifierSource(selectedStat);
+
+        // 기존 모디파이어 찾기
+        StatModifier existingModifier = statMap.getInstance(selectedStat.name()).getModifier("selectedAttribute");
+
+        if (existingModifier != null) {
+            // 기존 모디파이어를 삭제
+            existingModifier.unregister(playerData.getMMOPlayerData());
+
+            if (selectedStat == StatType.SKILL_CRITICAL_STRIKE_CHANCE) {
+                StatModifier newModifier = existingModifier.add(additionalValue);
+                newModifier.register(playerData.getMMOPlayerData());
+                StatModifier newModifier2 = statMap.getInstance(StatType.SKILL_CRITICAL_STRIKE_POWER.name()).getModifier("selectedAttribute").add(10);
+                newModifier2.register(playerData.getMMOPlayerData());
+            } else {
+                // 새로운 총 값으로 모디파이어를 추가
+                StatModifier newModifier = existingModifier.add(additionalValue);
+                newModifier.register(playerData.getMMOPlayerData());
+            }
+            player.sendMessage(ChatColor.GREEN + "Your " + selectedStat.name() + " has been increased to " + (existingModifier.getValue() + additionalValue) + "!");
+        } else {
+            if (selectedStat == StatType.SKILL_CRITICAL_STRIKE_CHANCE) {
+                StatModifier newModifier = new StatModifier("selectedAttribute", selectedStat.name(), additionalValue, modifierType, equipmentSlot, modifierSource);
+                newModifier.register(playerData.getMMOPlayerData());
+                StatModifier newModifier2 = new StatModifier("selectedAttribute", StatType.SKILL_CRITICAL_STRIKE_POWER.name(), 10, ModifierType.FLAT, equipmentSlot, modifierSource);
+                newModifier2.register(playerData.getMMOPlayerData());
+            } else {
+                // 새 모디파이어 등록
+                StatModifier newModifier = new StatModifier("selectedAttribute", selectedStat.name(), additionalValue, modifierType, equipmentSlot, modifierSource);
+                newModifier.register(playerData.getMMOPlayerData());
+            }
+            player.sendMessage(ChatColor.GREEN + "Your " + selectedStat.name() + " has been increased by " + additionalValue + "!");
         }
-
-
-        player.sendMessage(ChatColor.GREEN + "Your " + selectedStat.name() + " has been increased!");
     }
 
+    private int getAdditionalValue(StatType selectedStat) {
+        // 이전과 같이 구현된 메소드
+        return switch (selectedStat) {
+            case SKILL_CRITICAL_STRIKE_CHANCE -> 5; //SKILL_CRITICAL_STRIKE_POWER는 handleAttributeSelection()에서 직접 수정.
+            case PHYSICAL_DAMAGE -> 7;
+            case MAGIC_DAMAGE -> 6;
+            case MAX_MANA -> 15;
+            case MANA_REGENERATION -> 3;
+            case MOVEMENT_SPEED -> 20;
+            case COOLDOWN_REDUCTION -> 1;
+            default -> 1;
+        };
+    }
+
+    private ModifierType getModifierType(StatType selectedStat) {
+        // 이전과 같이 구현된 메소드
+        return switch (selectedStat) {
+            case CRITICAL_STRIKE_CHANCE, COOLDOWN_REDUCTION, MOVEMENT_SPEED -> ModifierType.RELATIVE;
+            default -> ModifierType.FLAT;
+        };
+    }
+
+    private ModifierSource getModifierSource(StatType selectedStat) {
+        // 이전과 같이 구현된 메소드
+        return switch (selectedStat) {
+            case MANA_REGENERATION, COOLDOWN_REDUCTION, MOVEMENT_SPEED, MAX_MANA -> ModifierSource.OTHER;
+            default -> ModifierSource.MAINHAND_ITEM;
+        };
+    }
 
 }
