@@ -7,10 +7,12 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class CorePlugin extends JavaPlugin {
 
     private PlayerDataStorage playerDataStorage;
+    private ConfigManager configManager;
 
     @Override
     public void onEnable() {
         this.playerDataStorage = new PlayerDataStorage(this);
+        this.configManager = new ConfigManager(this);
         CoreSystem coreSystem = new CoreSystem(this, playerDataStorage);
 
         getServer().getPluginManager().registerEvents(coreSystem, this);
@@ -24,5 +26,9 @@ public final class CorePlugin extends JavaPlugin {
     public void onDisable() {
         getLogger().info(ChatColor.AQUA + "[COREPLUGIN] CorePlugin disabled.");
 
+    }
+
+    public ConfigManager getConfigManager() {
+        return configManager;
     }
 }

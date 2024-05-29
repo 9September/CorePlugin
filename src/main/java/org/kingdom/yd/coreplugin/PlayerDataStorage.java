@@ -36,6 +36,17 @@ public class PlayerDataStorage {
         return config.getString(uuid.toString() + ".attributes." + slot + ".key");
     }
 
+    public int getAttributeValue(UUID uuid, int slot) {
+        return config.getInt(uuid.toString() + ".attributes." + slot + ".value", 0);
+    }
+
+    public void incrementAttributeValue(UUID uuid, int slot, int increment) {
+        int currentValue = config.getInt(uuid.toString() + ".attributes." + slot + ".value", 0);
+        int newValue = currentValue + increment;
+        config.set(uuid.toString() + ".attributes." + slot + ".value", newValue);
+        saveData();
+    }
+
     public void saveData() {
         try {
             config.save(dataFile);

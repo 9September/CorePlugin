@@ -70,6 +70,10 @@
             <id>phoenix</id>
             <url>https://nexus.phoenixdevt.fr/repository/maven-public/</url>
         </repository>
+        <repository>
+            <id>jitpack-repo</id>
+            <url>https://jitpack.io</url>
+        </repository>
 
     </repositories>
 
@@ -114,6 +118,13 @@
             <groupId>net.Indyuce</groupId>
             <artifactId>MMOCore-API</artifactId>
             <version>1.12.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.LoneDev6</groupId>
+            <artifactId>api-itemsadder</artifactId>
+            <version>3.6.1</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

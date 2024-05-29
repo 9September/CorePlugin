@@ -1,0 +1,50 @@
+{
+  "gui_titles": {
+    "core_system": "CORE SYSTEM",
+    "attribute_selection": "Attribute Selection"
+  },
+  "gui_items": {
+    "slots": {
+      "default": {
+        "material": "BLACK_STAINED_GLASS_PANE",
+        "display_name": "Select an attribute",
+        "state": "default"
+      },
+      "locked": {
+        "material": "RED_STAINED_GLASS_PANE",
+        "display_name": "Locked",
+        "state": "locked"
+      }
+    },
+    "attributes": {
+      "MAX_HEALTH": {
+        "material": "RED_DYE",
+        "display_name": "Health"
+      },
+      "HEALTH_REGENERATION": {
+        "material": "ORANGE_DYE",
+        "display_name": "Health Regeneration"
+      },
+      "MAX_MANA": {
+        "material": "YELLOW_DYE",
+        "display_name": "Mana"
+      },
+      "MANA_REGENERATION": {
+        "material": "GREEN_DYE",
+        "display_name": "Mana Regeneration"
+      },
+      "STAMINA_REGENERATION": {
+        "material": "BLUE_DYE",
+        "display_name": "Stamina Regeneration"
+      },
+      "KNOCKBACK_RESISTANCE": {
+        "material": "PURPLE_DYE",
+        "display_name": "Knockback Resistance"
+      },
+      "COOLDOWN_REDUCTION": {
+        "material": "WHITE_DYE",
+        "display_name": "Cooldown Reduction"
+      }
+    }
+  }
+}
